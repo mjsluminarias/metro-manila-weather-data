@@ -1,0 +1,22 @@
+# dbt/models/staging/_stg_models.yml
+version: 2
+
+models:
+  - name: stg_weather_data
+    config:
+        materialized: table
+        unique_key: id
+    tests:
+      - unique:
+          column_name: id
+      - not_null:
+          column_name: id
+    columns:
+      - name: id
+      - name: city
+      - name: temp
+      - name: weather_desc
+      - name: windspeed
+      - name: local_time
+      - name: _ingested_at
+      - name: utc_offset

@@ -1,0 +1,23 @@
+# dbt/models/sources/_sources.yml
+version: 2
+
+sources:
+  - name: weather_source
+    # This pulls the DB name from .env. Defaults to 'db' if missing.
+    database: "{{ env_var('POSTGRES_DB', 'db') }}"
+    schema: dev
+    tables:
+      - name: raw_weather_data
+        description: "Raw weather data ingested from the Weatherstack API"
+        columns:
+          - name: id             
+            tests:
+              - unique
+              - not_null
+          - name: city 
+          - name: temp 
+          - name: weather_desc 
+          - name: windspeed 
+          - name: local_time 
+          - name: _ingested_at 
+          - name: utc_offset 

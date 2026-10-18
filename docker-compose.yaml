@@ -1,0 +1,73 @@
+# docker-compose.yaml
+
+services:
+  # --- DATABASE LAYER ---
+  # Primary metadata and raw landing zone storage.
+  db:
+    image: postgres:14.17
+    container_name: postgres_container
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      # Maps Host 5000 -> Container 5432. 
+      # Allows external local scripts/GUIs to connect while avoiding conflicts with system-level Postgres.
+      - "5000:5432" 
+    volumes:
+      - ./postgres/data:/var/lib/postgresql/data # Persistence: Ensures data survives container restarts.
+      - ./init-db:/docker-entrypoint-initdb.d   # Bootstrap: Executes initial SQL setup on first run.
+    networks:
+      - my-network
+
+  # --- ORCHESTRATION LAYER ---
+  # Apache Airflow Control Plane managing DAG scheduling and execution logic.
+  af:  
+    container_name: airflow_container
+    image: apache/airflow:3.0.0
+    user: "1000:0" # Executes as unprivileged user for security, with root group for socket access.
+    depends_on:
+      - db
+    environment:
+      # Internal Metadata Connection: Uses the service name 'db' for container-to-container DNS resolution.
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASS}@db:5432/${AIRFLOW_DB_NAME}
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__DAGS_FOLDER=/opt/airflow/airflow/dags # Overrides default path to match local repo structure.
+    ports:
+      - "8080:8080" # Webserver UI accessible at localhost:8080.
+    volumes:
+      - .:/opt/airflow                             # Bind Mount: Real-time sync between local repo and container.
+      - /var/run/docker.sock:/var/run/docker.sock  # DooD (Docker-out-of-Docker): Allows Airflow to trigger sibling containers.
+    networks:
+      - my-network
+    command: standalone
+
+  # --- TRANSFORMATION LAYER ---
+  # Dedicated dbt environment for modular data modeling (Medallion Architecture).
+  dbt:
+    container_name: dbt_container
+    image: ghcr.io/dbt-labs/dbt-postgres:1.8.2
+    user: "1000:1000"
+    environment:
+      - DBT_PROFILES_DIR=/usr/app
+      - DBT_PROJECT_DIR=/usr/app
+      - DB_HOST=db       # Internal network host name.
+      - DB_PORT=5432     # Standard internal Postgres port.
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_SCHEMA=dev
+    volumes:
+      - ./dbt:/usr/app   # Maps local dbt models, macros, and seeds into the container.
+    networks:
+      - my-network
+    depends_on:
+      - db
+    command: run    
+    entrypoint: /bin/sh -c "sleep infinity" # Keeps container alive for Airflow to execute commands via 'docker exec'.
+
+# --- NETWORK TOPOLOGY ---
+# Bridge network isolating the data platform services from the host network.
+networks:
+  my-network:
+    driver: bridge

@@ -1,0 +1,31 @@
+# dbt/models/mart/_mart_models.yml
+version: 2
+
+models:
+  - name: weather_report
+    config:
+      materialized: table
+    tests:
+      - unique:
+          column_name: id
+      - not_null:
+          column_name: id
+    columns:
+      - name: id
+      - name: city
+      - name: temp
+      - name: weather_desc
+      - name: windspeed
+      - name: local_time
+      - name: _ingested_at_local
+      - name: _date
+      - name: temp_category
+  
+  - name: weather_avg_daily
+    config:
+      materialized: table
+    columns:
+      - name: city
+      - name: _date
+      - name: avg_temp
+      - name: avg_windspeed

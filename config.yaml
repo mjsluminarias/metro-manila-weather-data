@@ -1,0 +1,10 @@
+# config.yaml
+
+api:
+  base_url: "https://api.weatherstack.com/current"
+  city: "New York"
+  units: "m"
+
+storage:
+  raw_path: "./data/raw"
+  processed_path: "./data/processed"
